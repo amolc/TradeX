@@ -10,7 +10,7 @@ class User(models.Model):
 
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='buyer')
 
     def __str__(self):
         return self.name
