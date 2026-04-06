@@ -403,3 +403,38 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         order.save(update_fields=["status", "supplier_response"])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def analytics(self, request):
+        profile = get_marketplace_profile(request.user)
+        queryset = self.get_queryset()
+        logistics_queryset = Logistics.objects.filter(order__in=queryset)
+
+        totals = queryset.aggregate(
+            total_requests=Count("id"),
+            total_value=Sum("total_amount"),
+        )
+
+        status_counts = {
+            item["status"]: item["count"]
+            for item in queryset.values("status").annotate(count=Count("id"))
+        }
+        type_counts = {
+            item["order_type"]: item["count"]
+            for item in queryset.values("order_type").annotate(count=Count("id"))
+        }
+        shipment_stages = {
+            item["tracking_stage"]: item["count"]
+            for item in logistics_queryset.values("tracking_stage").annotate(count=Count("id"))
+        }
+
+        return Response(
+            {
+                "scope": profile.role if profile else "all",
+                "total_requests": totals["total_requests"] or 0,
+                "total_value": totals["total_value"] or 0,
+                "status_counts": status_counts,
+                "type_counts": type_counts,
+                "shipment_stages": shipment_stages,
+            }
+        )

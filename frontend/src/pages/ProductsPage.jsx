@@ -50,13 +50,27 @@ function ProductsPage() {
   }, [products, searchTerm])
 
   return (
-    <section className="page-card">
-      <h2 className="page-title">Marketplace Products</h2>
-      <p className="page-text">
-        Browse and search supplier listings before creating an enquiry or order.
-      </p>
+    <section className="page-card marketplace-shell">
+      <div className="marketplace-hero">
+        <p className="eyebrow">Trade Listings</p>
+        <h2 className="page-title">Marketplace Products</h2>
+        <p className="page-text">
+          Browse trusted supplier listings, compare availability, and open a
+          product page when you are ready to enquire or place an order.
+        </p>
+        <div className="marketplace-summary">
+          <div className="marketplace-summary-card">
+            <span className="marketplace-summary-value">{products.length}</span>
+            <span className="marketplace-summary-label">Live Listings</span>
+          </div>
+          <div className="marketplace-summary-card">
+            <span className="marketplace-summary-value">{filteredProducts.length}</span>
+            <span className="marketplace-summary-label">Matching Results</span>
+          </div>
+        </div>
+      </div>
 
-      <div className="section-gap">
+      <div className="section-gap marketplace-toolbar">
         <label className="field-label" htmlFor="search">
           Search Products
         </label>
@@ -78,16 +92,30 @@ function ProductsPage() {
       ) : null}
 
       {!loading && !error && filteredProducts.length > 0 ? (
-        <div className="card-grid">
+        <div className="product-grid">
           {filteredProducts.map((product) => (
-            <article className="list-item" key={product.id}>
-              <h3>{product.name}</h3>
-              <p>Price: {product.price}</p>
-              <p>Quantity: {product.quantity}</p>
-              <p>Supplier: {product.supplier?.name || product.supplier?.email || 'N/A'}</p>
-              <Link className="inline-link" to={`/products/${product.id}`}>
-                Open product page
-              </Link>
+            <article className="list-item product-card" key={product.id}>
+              <div className="product-card-top">
+                <div>
+                  <p className="product-card-kicker">Industrial Supply</p>
+                  <h3>{product.name}</h3>
+                </div>
+                <span className="product-pill">Ready</span>
+              </div>
+
+              <div className="product-meta">
+                <p className="product-price">Price: {product.price}</p>
+                <p>Available Quantity: {product.quantity}</p>
+                <p>
+                  Supplier: {product.supplier?.name || product.supplier?.email || 'N/A'}
+                </p>
+              </div>
+
+              <div className="product-card-footer">
+                <Link className="button product-link-button" to={`/products/${product.id}`}>
+                  Open Product Page
+                </Link>
+              </div>
             </article>
           ))}
         </div>
