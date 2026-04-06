@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AddProductPage from './pages/AddProductPage'
+import ChatPage from './pages/ChatPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import MarketplacePage from './pages/MarketplacePage'
@@ -31,6 +32,14 @@ function AppLayout() {
             element={
               <ProtectedRoute>
                 <ConversationList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/conversations/:id"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
               </ProtectedRoute>
             }
           />

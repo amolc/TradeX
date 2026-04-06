@@ -116,6 +116,7 @@ class ConversationCreateSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     user = UserNestedSerializer(read_only=True)
     product = ProductNestedSerializer(read_only=True)
+    conversation_id = serializers.IntegerField(source="conversation.id", read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
         source="product",
@@ -128,6 +129,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "product",
+            "conversation_id",
             "product_id",
             "quantity",
             "order_type",

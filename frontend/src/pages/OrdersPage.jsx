@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Spinner from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -9,6 +10,7 @@ import {
 } from '../services/api'
 
 function OrdersPage() {
+  const navigate = useNavigate()
   const { role } = useAuth()
   const [orders, setOrders] = useState([])
   const [logistics, setLogistics] = useState([])
@@ -51,6 +53,11 @@ function OrdersPage() {
   )
 
   const handleSupplierAction = async (order, action) => {
+    if (action === 'respond' && order.conversation_id) {
+      navigate(`/conversations/${order.conversation_id}`)
+      return
+    }
+
     setSubmittingKey(`${action}-${order.id}`)
 
     try {

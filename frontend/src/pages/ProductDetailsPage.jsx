@@ -46,13 +46,18 @@ function ProductDetailsPage() {
     setError('')
 
     try {
-      await createOrder({
+      const response = await createOrder({
         product_id: Number(productId),
         quantity: Number(quantity),
         order_type: requestType,
         shipping_mode: requestType === 'order' ? shippingMode : '',
       })
-      navigate('/orders')
+
+      if (requestType === 'enquiry' && response.data?.conversation_id) {
+        navigate(`/conversations/${response.data.conversation_id}`)
+      } else {
+        navigate('/orders')
+      }
     } catch (err) {
       const data = err.response?.data
       const detail =
