@@ -1,35 +1,150 @@
 # TradeX Asia
 
-TradeX Asia is a full-stack marketplace prototype for buyers and suppliers. The backend is a Django REST API with JWT authentication, and the frontend is a React + Vite application that consumes the API.
+TradeX Asia is a full-stack B2B marketplace prototype for buyers and suppliers.  
+It combines a Django REST backend with a React + Vite frontend and supports product discovery, enquiries, orders, chat-based negotiation, shipment tracking, and logistics inquiry handling.
 
-## Project Structure
+## Tech Stack
 
-- `backend/`: Django project with apps for `users`, `products`, `orders`, and `logistics`
-- `frontend/`: React client with role-based pages for buyers and suppliers
-
-## Current Feature Flow
-
-- Users can register as a `buyer` or `supplier`
-- Users can log in through JWT token endpoints
-- Suppliers can create products
-- Buyers can browse products and place orders
-- Orders automatically create a logistics record with a default `pending` status
-- Suppliers can view incoming orders for their products
-
-## Backend Stack
+### Backend
 
 - Django
 - Django REST Framework
+- PostgreSQL
 - `django-cors-headers`
 - `djangorestframework-simplejwt`
-- SQLite
 
-## Frontend Stack
+### Frontend
 
 - React
 - React Router
 - Axios
 - Vite
+
+## Project Structure
+
+- `backend/`
+  - `users/` buyer and supplier marketplace profiles
+  - `products/` supplier product listings
+  - `orders/` order flow, enquiries, conversations, chat, offers
+  - `logistics/` shipment tracking and logistics inquiries
+- `frontend/`
+  - role-based buyer and supplier dashboards
+  - marketplace, orders, logistics, and chat pages
+
+## Current Features
+
+### Authentication and Roles
+
+- User registration for `buyer` and `supplier`
+- JWT login and refresh endpoints
+- Role-aware frontend dashboards
+
+### Marketplace
+
+- Suppliers can create product listings
+- Buyers can browse marketplace products
+- Product detail page supports placing orders and sending enquiries
+
+### Enquiry -> Chat -> Offer -> Order Flow
+
+- Buyer enquiry creates or reuses a shared conversation for:
+  - buyer
+  - supplier
+  - product
+- Initial enquiry message is automatically stored in the conversation
+- Buyer and supplier can continue messaging in the same chat thread
+- Suppliers can send structured offers with:
+  - unit price
+  - quantity
+  - delivery days
+- Buyers can accept an offer and create an order linked to:
+  - the conversation
+  - the accepted offer message
+
+### Orders and Requests
+
+- Buyers can create:
+  - enquiries
+  - orders
+- Suppliers can:
+  - respond to enquiries
+  - confirm orders
+- Orders include:
+  - quantity
+  - unit price
+  - total amount
+  - shipping mode
+  - supplier response
+
+### Logistics Tracking
+
+- Logistics records are created automatically for orders
+- Suppliers can update shipment tracking details:
+  - tracking stage
+  - shipment status
+  - location
+- Buyers and suppliers can view logistics progress through the dashboard flow
+
+### Logistics Inquiry Flow
+
+- Buyer-side logistics page supports:
+  - service cards
+  - service details
+  - quote request form
+- Logistics inquiry stores:
+  - full name
+  - email
+  - service type
+  - cargo type
+  - origin
+  - destination
+  - quantity
+  - weight
+  - optional notes
+- Supplier-side logistics page shows incoming logistics inquiries
+- Supplier can contact the buyer through:
+  - email
+  - Telegram link
+
+## Main Frontend Pages
+
+- `/dashboard`
+- `/products`
+- `/products/:productId`
+- `/orders`
+- `/logistics`
+- `/conversations`
+- `/conversations/:id`
+
+## Main API Routes
+
+### Auth and Users
+
+- `POST /api/token/`
+- `POST /api/token/refresh/`
+- `GET|POST /api/users/`
+
+### Products
+
+- `GET|POST /api/products/`
+
+### Orders
+
+- `GET|POST /api/orders/`
+- `POST /api/orders/{id}/supplier_action/`
+- `GET /api/orders/analytics/`
+
+### Conversations and Messages
+
+- `GET|POST /api/conversations/`
+- `GET|POST /api/conversations/{id}/messages/`
+- `POST /api/messages/accept-offer/`
+
+### Logistics
+
+- `GET|POST /api/logistics/`
+- `PATCH /api/logistics/{id}/`
+- `GET|POST /api/logistics-inquiry/`
 
 ## Local Setup
 
@@ -44,7 +159,9 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-The backend runs at `http://127.0.0.1:8000/`.
+Backend runs at:
+
+- `http://127.0.0.1:8000/`
 
 ### Frontend
 
@@ -54,38 +171,42 @@ npm install
 npm run dev
 ```
 
-The frontend expects the API at `http://127.0.0.1:8000/api/`.
+Frontend runs at:
 
-## API Routes
+- `http://127.0.0.1:5173/`
 
-- `POST /api/token/`
-- `POST /api/token/refresh/`
-- `GET|POST /api/users/`
-- `GET|POST /api/products/`
-- `GET|POST /api/orders/`
-- `GET|POST /api/logistics/`
+The frontend is configured to call:
 
-## Verification Performed
+- `http://127.0.0.1:8000/api/`
 
-- `python manage.py check`
-- `npm run build`
+## Important Notes
 
-Both commands completed successfully in the current workspace.
+- The project currently uses Django auth users for login and a separate `users.User` profile model for marketplace role data.
+- Some temporary local-testing fallbacks may still exist in backend view logic to support unauthenticated development flows.
+- If you add the new logistics inquiry fields to a fresh environment, make sure migrations are applied.
 
-## Important Implementation Note
+## Recommended Commands
 
-The project currently uses two different user representations:
+### Backend validation
 
-- Django's built-in authenticated user for JWT login and `request.user`
-- A separate `users.User` profile model for marketplace data
+```powershell
+cd backend
+python manage.py check
+```
 
-This is important because some backend code expects `request.user.role`, while the role field exists on `users.User`, not on Django's default auth model. The repo builds and passes Django system checks, but this mismatch can still cause runtime issues in authenticated product and order flows. I did not change that behavior because it is a deeper model-design decision and changing it carelessly could hamper the project.
+### Frontend build verification
 
-## Recommended Next Safe Improvement
+```powershell
+cd frontend
+npm run build
+```
 
-If you want, the next careful step would be to unify authentication and marketplace user data by either:
+## Recent Functional Additions
 
-1. Switching to a custom Django user model, or
-2. Keeping the profile model and updating all permission/query logic to resolve the related profile explicitly
+- Shared conversation-based enquiry system
+- Chat page for buyer/supplier negotiation
+- Offer sending and offer acceptance flow
+- Conversation-linked order creation
+- Logistics inquiry page for buyers
+- Supplier inquiry review view in logistics section
 
-I left the code untouched in that area for safety.
