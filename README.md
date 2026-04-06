@@ -20,6 +20,13 @@ It combines a Django REST backend with a React + Vite frontend and supports prod
 - Axios
 - Vite
 
+### Admin Frontend
+
+- React
+- React Router
+- Axios
+- Vite
+
 ## Project Structure
 
 - `backend/`
@@ -30,6 +37,9 @@ It combines a Django REST backend with a React + Vite frontend and supports prod
 - `frontend/`
   - role-based buyer and supplier dashboards
   - marketplace, orders, logistics, and chat pages
+- `admin-frontend/`
+  - separate internal admin dashboard frontend
+  - admin login, protected routes, overview, user management, inquiries, chat monitor, activity tracking
 
 ## Current Features
 
@@ -106,6 +116,21 @@ It combines a Django REST backend with a React + Vite frontend and supports prod
   - email
   - Telegram link
 
+### Admin Frontend Overview
+
+- A separate React admin panel is available for internal platform management
+- It is isolated from the customer-facing frontend and uses the same Django backend APIs
+- Current admin pages include:
+  - dashboard overview
+  - user management
+  - inquiry management
+  - product/listing review
+  - conversation monitor
+  - activity tracking
+- Admin access currently expects a Django auth account with:
+  - `is_staff = True`
+  - or `is_superuser = True`
+
 ## Main Frontend Pages
 
 - `/dashboard`
@@ -179,6 +204,22 @@ The frontend is configured to call:
 
 - `http://127.0.0.1:8000/api/`
 
+### Admin Frontend
+
+```powershell
+cd admin-frontend
+npm install
+npm run dev
+```
+
+Admin frontend runs at:
+
+- `http://127.0.0.1:5174/`
+
+Folder location:
+
+- `admin-frontend/`
+
 ## Important Notes
 
 - The project currently uses Django auth users for login and a separate `users.User` profile model for marketplace role data.
@@ -209,4 +250,3 @@ npm run build
 - Conversation-linked order creation
 - Logistics inquiry page for buyers
 - Supplier inquiry review view in logistics section
-
