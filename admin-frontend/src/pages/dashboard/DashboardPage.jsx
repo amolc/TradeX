@@ -1,0 +1,56 @@
+import { useEffect, useState } from 'react'
+import PageHeader from '../../components/ui/PageHeader'
+import StatCard from '../../components/ui/StatCard'
+import { getDashboardOverview } from '../../services/dashboardService'
+import { formatDateTime } from '../../utils/formatters'
+
+export default function DashboardPage() {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setError('')
+
+      try {
+        const response = await getDashboardOverview()
+        setData(response)
+      } catch {
+        setError('Could not load dashboard overview.')
+      }
+    }
+
+    loadDashboard()
+  }, [])
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        description="Track users, inquiries, logistics traffic, and recent platform activity from one place."
+        eyebrow="Overview"
+        title="Admin Dashboard"
+      />
+
+      {error ? <div className="alert error">{error}</div> : null}
+
+      <div className="stats-grid">
+        <StatCard detail="Registered buyer and supplier accounts" title="Total Users" value={data?.totalUsers || 0} />
+        <StatCard detail="Combined enquiry and order records" title="Orders / Queries" value={data?.totalOrders || 0} />
+        <StatCard detail="Reported from analytics endpoint" title="Revenue" value={`₹${data?.revenue || 0}`} />
+        <StatCard detail="Open logistics requests" title="Logistics Inquiries" value={data?.logisticsInquiriesCount || 0} />
+      </div>
+
+      <section className="panel">
+        <h3 className="panel-title">Recent Activity</h3>
+        <div className="activity-list">
+          {(data?.recentActivity || []).map((item) => (
+            <div className="activity-item" key={item.id}>
+              <strong>{item.title}</strong>
+              <span>{formatDateTime(item.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}

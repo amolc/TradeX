@@ -28,7 +28,16 @@ class TradeXTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise AuthenticationFailed("No active account found with the given credentials")
 
         attrs[self.username_field] = auth_user.get_username()
-        return super().validate(attrs)
+        data = super().validate(attrs)
+        data["user"] = {
+            "id": auth_user.id,
+            "username": auth_user.get_username(),
+            "email": auth_user.email,
+            "is_staff": auth_user.is_staff,
+            "is_superuser": auth_user.is_superuser,
+            "is_admin": auth_user.is_staff or auth_user.is_superuser,
+        }
+        return data
 
 
 class TradeXTokenObtainPairView(TokenObtainPairView):
