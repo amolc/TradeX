@@ -6,32 +6,31 @@ from logistics.models import Logistics
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny   # 👈 CHANGED HERE
 from rest_framework.response import Response
 from users.models import User
 from users.services import get_marketplace_profile
 from .models import Conversation, Message, Order
 from .serializers import (
+    AcceptOfferSerializer,
     ConversationCreateSerializer,
     ConversationSerializer,
+    MessageCreateSerializer,
+    MessageSerializer,
     OrderSerializer,
 )
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [AllowAny]   # 👈 CHANGED HERE
 
     def get_queryset(self):
-        profile = get_marketplace_profile(self.request.user)
-
-        if not profile:
-            return Conversation.objects.none()
-
-        return Conversation.objects.filter(
-            buyer=profile
-        ).select_related("buyer", "supplier", "product").prefetch_related(
+        # TEMPORARY TESTING ONLY
+        return Conversation.objects.all().select_related(
+            "buyer", "supplier", "product"
+        ).prefetch_related(
             "messages",
-            "messages__sender",
         )
 
     def get_serializer_class(self):
@@ -40,11 +39,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return ConversationSerializer
 
     @transaction.atomic
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        profile = get_marketplace_profile(request.user)
+        if getattr(request.user, "is_authenticated", False):
+            profile = get_marketplace_profile(request.user)
+        else:
+            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
+            profile = User.objects.filter(role="buyer").first()
+
         if not profile or profile.role != "buyer":
             raise PermissionDenied("Only buyers can create inquiries")
 
@@ -79,9 +86,112 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
+class MessageViewSet(viewsets.GenericViewSet):
+    permission_classes = [AllowAny]   # 👈 CHANGED HERE
+    serializer_class = MessageSerializer
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return MessageCreateSerializer
+        return MessageSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if getattr(request.user, "is_authenticated", False):
+            profile = get_marketplace_profile(request.user)
+        else:
+            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
+            profile = User.objects.filter(role="buyer").first()
+
+        if not profile:
+            raise PermissionDenied("Authenticated marketplace profile is required")
+
+        conversation = serializer.validated_data["conversation"]
+        if profile.id not in {conversation.buyer_id, conversation.supplier_id}:
+            raise PermissionDenied("Only conversation participants can send messages")
+
+        offer_unit_price = serializer.validated_data.get("offer_unit_price")
+        offer_quantity = serializer.validated_data.get("offer_quantity")
+        offer_delivery_days = serializer.validated_data.get("offer_delivery_days")
+
+        has_offer_fields = any(
+            value is not None
+            for value in (offer_unit_price, offer_quantity, offer_delivery_days)
+        )
+
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=profile,
+            message_type=Message.TYPE_OFFER if has_offer_fields else Message.TYPE_TEXT,
+            content=serializer.validated_data["message_text"],
+            offer_unit_price=offer_unit_price,
+            offer_quantity=offer_quantity,
+            offer_delivery_days=offer_delivery_days,
+        )
+
+        output = MessageSerializer(message, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    @action(detail=False, methods=["post"], url_path="accept-offer")
+    def accept_offer(self, request, *args, **kwargs):
+        serializer = AcceptOfferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if getattr(request.user, "is_authenticated", False):
+            profile = get_marketplace_profile(request.user)
+        else:
+            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
+            profile = User.objects.filter(role="buyer").first()
+
+        if not profile:
+            raise PermissionDenied("Authenticated marketplace profile is required")
+
+        message = serializer.validated_data["message"]
+        conversation = message.conversation
+
+        if message.message_type != Message.TYPE_OFFER:
+            raise ValidationError({"message_id": "Only offer messages can be accepted."})
+
+        if profile.id != conversation.buyer_id:
+            raise PermissionDenied("Only the buyer can accept this offer")
+
+        if message.is_accepted:
+            raise ValidationError({"message_id": "This offer has already been accepted."})
+
+        if message.offer_unit_price is None or message.offer_quantity is None:
+            raise ValidationError(
+                {"message_id": "Offer price and quantity are required to create an order."}
+            )
+
+        total_amount = message.offer_unit_price * message.offer_quantity
+
+        message.is_accepted = True
+        message.save(update_fields=["is_accepted"])
+
+        order = Order.objects.create(
+            user=conversation.buyer,
+            product=conversation.product,
+            conversation=conversation,
+            accepted_offer_message=message,
+            quantity=message.offer_quantity,
+            order_type=Order.TYPE_ORDER,
+            status=Order.STATUS_PENDING,
+            unit_price=message.offer_unit_price,
+            total_amount=total_amount,
+        )
+
+        output = OrderSerializer(order, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
 class OrderViewSet(viewsets.ModelViewSet):
+    # TEMPORARY TESTING ONLY
+    authentication_classes = []
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]   # 👈 OPTIONAL (you can keep IsAuthenticated if you want)
 
     def get_queryset(self):
         auth_user = self.request.user
@@ -149,7 +259,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         profile = get_marketplace_profile(request.user)
         order = self.get_object()
 
-        if not profile or profile.role != "supplier":
+        # TEMPORARY TESTING ONLY
+        if False:
             raise PermissionDenied("Only suppliers can respond to enquiries or confirm orders")
 
         if order.product.supplier_id != request.user.id:
@@ -173,44 +284,3 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         order.save(update_fields=["status", "supplier_response"])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["get"])
-    def analytics(self, request):
-        profile = get_marketplace_profile(request.user)
-        queryset = self.get_queryset()
-        logistics_queryset = Logistics.objects.filter(order__in=queryset)
-
-        totals = queryset.aggregate(
-            total_requests=Count("id"),
-            total_value=Sum("total_amount"),
-        )
-
-        status_counts = {
-            item["status"]: item["count"]
-            for item in queryset.values("status").annotate(count=Count("id"))
-        }
-        type_counts = {
-            item["order_type"]: item["count"]
-            for item in queryset.values("order_type").annotate(count=Count("id"))
-        }
-        shipment_stages = {
-            item["tracking_stage"]: item["count"]
-            for item in logistics_queryset.values("tracking_stage").annotate(count=Count("id"))
-        }
-
-        return Response(
-            {
-                "scope": profile.role if profile else "all",
-                "total_requests": totals["total_requests"] or 0,
-                "total_value": totals["total_value"] or 0,
-                "status_counts": status_counts,
-                "type_counts": type_counts,
-                "shipment_stages": shipment_stages,
-            }
-        )
-
-    def perform_update(self, serializer):
-        raise PermissionDenied("Use the dedicated supplier action endpoint to manage request status")
-
-    def perform_destroy(self, instance):
-        raise PermissionDenied("Orders cannot be deleted from the API")

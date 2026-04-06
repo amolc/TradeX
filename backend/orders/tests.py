@@ -157,3 +157,255 @@ class ConversationFlowTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_conversation_participant_can_send_message(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+
+        self.client.force_authenticate(user=self.supplier_auth)
+        response = self.client.post(
+            reverse("messages-list"),
+            {
+                "conversation_id": conversation.id,
+                "message_text": "We can supply 10 units next week.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        message = Message.objects.get()
+        self.assertEqual(message.conversation, conversation)
+        self.assertEqual(message.sender, self.supplier_profile)
+        self.assertEqual(message.message_type, Message.TYPE_TEXT)
+        self.assertEqual(message.content, "We can supply 10 units next week.")
+
+    def test_non_participant_cannot_send_message(self):
+        outsider_auth = AuthUser.objects.create_user(
+            username="outsider@example.com",
+            email="outsider@example.com",
+            password="testpass123",
+        )
+        User.objects.create(
+            name="Outsider",
+            email="outsider@example.com",
+            role="buyer",
+        )
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+
+        self.client.force_authenticate(user=outsider_auth)
+        response = self.client.post(
+            reverse("messages-list"),
+            {
+                "conversation_id": conversation.id,
+                "message_text": "I should not be able to post here.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_message_text_cannot_be_empty(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+
+        self.client.force_authenticate(user=self.buyer_auth)
+        response = self.client.post(
+            reverse("messages-list"),
+            {
+                "conversation_id": conversation.id,
+                "message_text": "   ",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_participant_can_get_messages_in_created_order(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        first_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.buyer_profile,
+            message_type=Message.TYPE_TEXT,
+            content="First message",
+        )
+        second_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.supplier_profile,
+            message_type=Message.TYPE_TEXT,
+            content="Second message",
+        )
+
+        self.client.force_authenticate(user=self.buyer_auth)
+        response = self.client.get(
+            reverse("messages-list"),
+            {"conversation_id": conversation.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["id"], first_message.id)
+        self.assertEqual(response.data[0]["content"], "First message")
+        self.assertEqual(response.data[1]["id"], second_message.id)
+        self.assertEqual(response.data[1]["content"], "Second message")
+
+    def test_non_participant_cannot_get_messages(self):
+        outsider_auth = AuthUser.objects.create_user(
+            username="viewer@example.com",
+            email="viewer@example.com",
+            password="testpass123",
+        )
+        User.objects.create(
+            name="Viewer",
+            email="viewer@example.com",
+            role="buyer",
+        )
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        Message.objects.create(
+            conversation=conversation,
+            sender=self.buyer_profile,
+            message_type=Message.TYPE_TEXT,
+            content="Visible only to participants",
+        )
+
+        self.client.force_authenticate(user=outsider_auth)
+        response = self.client.get(
+            reverse("messages-list"),
+            {"conversation_id": conversation.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_buyer_can_accept_offer_and_create_order(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        offer_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.supplier_profile,
+            message_type=Message.TYPE_OFFER,
+            content="Offer for 5 units",
+            offer_unit_price=400.00,
+            offer_quantity=5,
+            offer_delivery_days=7,
+        )
+
+        self.client.force_authenticate(user=self.buyer_auth)
+        response = self.client.post(
+            reverse("messages-accept-offer"),
+            {"message_id": offer_message.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        offer_message.refresh_from_db()
+        order = Order.objects.get(accepted_offer_message=offer_message)
+
+        self.assertTrue(offer_message.is_accepted)
+        self.assertEqual(order.user, self.buyer_profile)
+        self.assertEqual(order.product, self.product)
+        self.assertEqual(order.conversation, conversation)
+        self.assertEqual(order.quantity, 5)
+        self.assertEqual(float(order.unit_price), 400.00)
+        self.assertEqual(float(order.total_amount), 2000.00)
+
+    def test_supplier_cannot_accept_offer(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        offer_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.supplier_profile,
+            message_type=Message.TYPE_OFFER,
+            content="Offer for 5 units",
+            offer_unit_price=400.00,
+            offer_quantity=5,
+        )
+
+        self.client.force_authenticate(user=self.supplier_auth)
+        response = self.client.post(
+            reverse("messages-accept-offer"),
+            {"message_id": offer_message.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_offer_message_cannot_be_accepted(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        text_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.supplier_profile,
+            message_type=Message.TYPE_TEXT,
+            content="Regular message",
+        )
+
+        self.client.force_authenticate(user=self.buyer_auth)
+        response = self.client.post(
+            reverse("messages-accept-offer"),
+            {"message_id": text_message.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_offer_cannot_be_accepted_twice(self):
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+        offer_message = Message.objects.create(
+            conversation=conversation,
+            sender=self.supplier_profile,
+            message_type=Message.TYPE_OFFER,
+            content="Offer for 5 units",
+            offer_unit_price=400.00,
+            offer_quantity=5,
+            is_accepted=True,
+        )
+
+        self.client.force_authenticate(user=self.buyer_auth)
+        response = self.client.post(
+            reverse("messages-accept-offer"),
+            {"message_id": offer_message.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -34,6 +34,49 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
 
 
+class MessageCreateSerializer(serializers.Serializer):
+    conversation_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conversation.objects.all(),
+        source="conversation",
+        write_only=True,
+    )
+    message_text = serializers.CharField(write_only=True)
+    offer_unit_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    offer_quantity = serializers.IntegerField(required=False, allow_null=True)
+    offer_delivery_days = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_message_text(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Message text cannot be empty.")
+        return value
+
+    def validate_offer_quantity(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Offer quantity must be greater than zero.")
+        return value
+
+    def validate_offer_delivery_days(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError(
+                "Offer delivery days must be greater than zero."
+            )
+        return value
+
+
+class AcceptOfferSerializer(serializers.Serializer):
+    message_id = serializers.PrimaryKeyRelatedField(
+        queryset=Message.objects.all(),
+        source="message",
+        write_only=True,
+    )
+
+
 class ConversationSerializer(serializers.ModelSerializer):
     buyer = UserNestedSerializer(read_only=True)
     supplier = UserNestedSerializer(read_only=True)

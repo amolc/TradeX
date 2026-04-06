@@ -11,6 +11,7 @@ import ProductsPage from './pages/ProductsPage'
 import RegisterPage from './pages/RegisterPage'
 import { useAuth } from './context/AuthContext'
 import './App.css'
+import ConversationList from './components/ConversationList'  // ✅ already added
 
 function AppLayout() {
   const { isAuthenticated } = useAuth()
@@ -23,6 +24,17 @@ function AppLayout() {
           <Route path="/" element={<MarketplacePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* 🔥 NEW ROUTE (ADD THIS) */}
+          <Route
+            path="/conversations"
+            element={
+              <ProtectedRoute>
+                <ConversationList />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/dashboard"
             element={
