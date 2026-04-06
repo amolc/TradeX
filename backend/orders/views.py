@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Sum
 from logistics.models import Logistics
 from rest_framework import status, viewsets
@@ -7,9 +8,75 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from users.models import User
 from users.services import get_marketplace_profile
-from .models import Order
-from .serializers import OrderSerializer
+from .models import Conversation, Message, Order
+from .serializers import (
+    ConversationCreateSerializer,
+    ConversationSerializer,
+    OrderSerializer,
+)
+
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        profile = get_marketplace_profile(self.request.user)
+
+        if not profile:
+            return Conversation.objects.none()
+
+        return Conversation.objects.filter(
+            buyer=profile
+        ).select_related("buyer", "supplier", "product").prefetch_related(
+            "messages",
+            "messages__sender",
+        )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ConversationCreateSerializer
+        return ConversationSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        profile = get_marketplace_profile(request.user)
+        if not profile or profile.role != "buyer":
+            raise PermissionDenied("Only buyers can create inquiries")
+
+        product = serializer.validated_data["product"]
+        supplier_profile = User.objects.filter(
+            email__iexact=product.supplier.email,
+            role="supplier",
+        ).first()
+
+        if not supplier_profile:
+            raise ValidationError(
+                {"product_id": "Supplier profile not found for this product."}
+            )
+
+        if supplier_profile.id == profile.id:
+            raise ValidationError("You cannot start an inquiry for your own product")
+
+        conversation = Conversation.objects.create(
+            buyer=profile,
+            supplier=supplier_profile,
+            product=product,
+            inquiry_text=serializer.validated_data["inquiry_text"],
+        )
+        Message.objects.create(
+            conversation=conversation,
+            sender=profile,
+            message_type=Message.TYPE_TEXT,
+            content=serializer.validated_data["inquiry_text"],
+        )
+
+        output = ConversationSerializer(conversation, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
 
 
 class OrderViewSet(viewsets.ModelViewSet):

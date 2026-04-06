@@ -20,13 +20,14 @@ from rest_framework.routers import DefaultRouter
 from users.views import UserViewSet
 from users.views import TradeXTokenObtainPairView
 from products.views import ProductViewSet
-from orders.views import OrderViewSet
+from orders.views import ConversationViewSet, OrderViewSet
 from logistics.views import LogisticsViewSet
 from rest_framework_simplejwt.views import TokenRefreshView
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='users')
 router.register(r'products', ProductViewSet, basename='products')
+router.register(r'conversations', ConversationViewSet, basename='conversations')
 router.register(r'orders', OrderViewSet, basename='orders')
 router.register(r'logistics', LogisticsViewSet, basename='logistics')
 

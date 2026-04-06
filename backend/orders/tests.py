@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from logistics.models import Logistics
 from products.models import Product
 from users.models import User
-from .models import Order
+from .models import Conversation, Message, Order
 
 
 AuthUser = get_user_model()
@@ -89,3 +89,71 @@ class OrderFlowTests(APITestCase):
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_CONFIRMED)
         self.assertEqual(order.supplier_response, "Confirmed for dispatch.")
+
+
+class ConversationFlowTests(APITestCase):
+    def setUp(self):
+        self.supplier_auth = AuthUser.objects.create_user(
+            username="supplier-chat@example.com",
+            email="supplier-chat@example.com",
+            password="testpass123",
+        )
+        self.buyer_auth = AuthUser.objects.create_user(
+            username="buyer-chat@example.com",
+            email="buyer-chat@example.com",
+            password="testpass123",
+        )
+        self.supplier_profile = User.objects.create(
+            name="Supplier Chat",
+            email="supplier-chat@example.com",
+            role="supplier",
+        )
+        self.buyer_profile = User.objects.create(
+            name="Buyer Chat",
+            email="buyer-chat@example.com",
+            role="buyer",
+        )
+        self.product = Product.objects.create(
+            name="Industrial Pump",
+            price=450.00,
+            quantity=15,
+            supplier=self.supplier_auth,
+        )
+
+    def test_buyer_can_create_conversation_with_initial_message(self):
+        self.client.force_authenticate(user=self.buyer_auth)
+
+        response = self.client.post(
+            reverse("conversations-list"),
+            {
+                "product_id": self.product.id,
+                "inquiry_text": "Need 10 units with delivery timeline.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        conversation = Conversation.objects.get()
+        message = Message.objects.get()
+
+        self.assertEqual(conversation.buyer, self.buyer_profile)
+        self.assertEqual(conversation.supplier, self.supplier_profile)
+        self.assertEqual(conversation.product, self.product)
+        self.assertEqual(conversation.inquiry_text, "Need 10 units with delivery timeline.")
+        self.assertEqual(message.conversation, conversation)
+        self.assertEqual(message.sender, self.buyer_profile)
+        self.assertEqual(message.content, "Need 10 units with delivery timeline.")
+
+    def test_supplier_cannot_create_conversation(self):
+        self.client.force_authenticate(user=self.supplier_auth)
+
+        response = self.client.post(
+            reverse("conversations-list"),
+            {
+                "product_id": self.product.id,
+                "inquiry_text": "Need pricing details.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
