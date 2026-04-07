@@ -136,7 +136,7 @@ function OrdersPage() {
                 <p>Quantity: {order.quantity}</p>
                 <p>Status: {order.status}</p>
                 <p>Shipping: {order.shipping_mode || 'Not selected'}</p>
-                <p>Total: {order.total_amount}</p>
+                <p>Total: Rs. {order.total_amount}</p>
                 <p>
                   Date:{' '}
                   {order.order_date

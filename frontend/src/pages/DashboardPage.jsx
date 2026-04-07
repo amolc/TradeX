@@ -103,7 +103,11 @@ function formatDate(value) {
 function formatCurrency(value) {
   const amount = Number(value)
   if (!Number.isFinite(amount) || amount <= 0) return null
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount)
 }
 
 function getConversationStatus(conversation) {

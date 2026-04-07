@@ -338,7 +338,7 @@ function Enquiries() {
                   </div>
                   {message.message_type === 'offer' ? (
                     <div className="supplier-offer-summary">
-                      <p>Price: {message.offer_unit_price}</p>
+                      <p>Price: Rs. {message.offer_unit_price}</p>
                       <p>MOQ: {message.offer_quantity}</p>
                       <p>Delivery: {message.offer_delivery_days} days</p>
                       <p>Notes: {message.content || 'Quotation from supplier'}</p>

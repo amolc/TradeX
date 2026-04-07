@@ -104,7 +104,7 @@ function ProductsPage() {
               </div>
 
               <div className="product-meta">
-                <p className="product-price">Price: {product.price}</p>
+                <p className="product-price">Price: Rs. {product.price}</p>
                 <p>Available Quantity: {product.quantity}</p>
                 <p>
                   Supplier: {product.supplier?.name || product.supplier?.email || 'N/A'}

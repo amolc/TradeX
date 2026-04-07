@@ -256,7 +256,7 @@ function Products() {
                   <div className="supplier-entity-head">
                     <div>
                       <h4>{product.name}</h4>
-                      <p>Price: {product.price}</p>
+                      <p>Price: Rs. {product.price}</p>
                       <p>Quantity: {product.quantity}</p>
                     </div>
                     <span className="status-pill neutral">Live</span>
