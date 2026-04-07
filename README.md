@@ -250,3 +250,4 @@ npm run build
 - Conversation-linked order creation
 - Logistics inquiry page for buyers
 - Supplier inquiry review view in logistics section
+.
