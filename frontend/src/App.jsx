@@ -44,6 +44,14 @@ function AppLayout() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/enquiry/:id"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/dashboard"
@@ -78,7 +86,31 @@ function AppLayout() {
             }
           />
           <Route
+            path="/product/:productId"
+            element={
+              <ProtectedRoute>
+                <ProductDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/orders"
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:id"
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shipments/:id"
             element={
               <ProtectedRoute>
                 <OrdersPage />
