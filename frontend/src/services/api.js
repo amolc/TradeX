@@ -134,4 +134,8 @@ export function createLogisticsInquiry(data) {
   return api.post('logistics-inquiry/', data)
 }
 
+export function replyToLogisticsInquiry(inquiryId, data) {
+  return api.post(`logistics-inquiry/${inquiryId}/reply/`, data)
+}
+
 export default api

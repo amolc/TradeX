@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from products.models import Product
 from users.models import User
 from orders.models import Order
-from .models import Logistics, LogisticsInquiry
+from .models import Logistics, LogisticsInquiry, LogisticsInquiryMessage
 
 
 AuthUser = get_user_model()
@@ -99,3 +99,49 @@ class LogisticsFlowTests(APITestCase):
         self.assertEqual(inquiry.buyer, self.buyer_profile)
         self.assertEqual(inquiry.email, "buyer2@example.com")
         self.assertEqual(inquiry.notes, "")
+        self.assertEqual(inquiry.status, LogisticsInquiry.STATUS_OPEN)
+        self.assertEqual(inquiry.messages.count(), 1)
+        self.assertEqual(
+            inquiry.messages.first().sender_role,
+            LogisticsInquiryMessage.SENDER_BUYER,
+        )
+
+    def test_supplier_can_reply_to_logistics_inquiry(self):
+        inquiry = LogisticsInquiry.objects.create(
+            buyer=self.buyer_profile,
+            name="Buyer Two",
+            email="buyer2@example.com",
+            service_type=LogisticsInquiry.SERVICE_SEA,
+            cargo_type="Steel Coils",
+            origin="Mumbai",
+            destination="Dubai",
+            quantity="10 tons",
+            weight="2000 kg",
+            notes="Need urgent handling",
+        )
+        LogisticsInquiryMessage.objects.create(
+            inquiry=inquiry,
+            sender_role=LogisticsInquiryMessage.SENDER_BUYER,
+            sender_name="Buyer Two",
+            sender_email="buyer2@example.com",
+            message="Need urgent handling",
+        )
+
+        self.client.force_authenticate(user=self.supplier_auth)
+
+        response = self.client.post(
+            reverse("logistics-inquiry-reply", args=[inquiry.id]),
+            {
+                "message": "We can handle this on the next sailing.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        inquiry.refresh_from_db()
+        self.assertEqual(inquiry.status, LogisticsInquiry.STATUS_REPLIED)
+        self.assertEqual(inquiry.messages.count(), 2)
+        self.assertEqual(
+            inquiry.messages.last().sender_role,
+            LogisticsInquiryMessage.SENDER_SUPPLIER,
+        )
