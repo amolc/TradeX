@@ -52,17 +52,25 @@ const S = {
   stat: { padding: 18, borderRadius: 20, border: '1px solid rgba(226,232,240,.92)', background: 'rgba(255,255,255,.96)' },
   mainGrid: { display: 'grid', gap: 24 },
   rowGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, .8fr)', gap: 24 },
-  contentGrid: { display: 'grid', gap: 24 },
+  fullRow: { display: 'grid', gap: 24 },
   section: { padding: 22 },
   sectionTitle: { margin: 0, fontSize: '1.22rem', color: '#0f172a' },
   sectionText: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.6 },
   list: { display: 'grid', gap: 12, marginTop: 18 },
   item: { padding: 14, borderRadius: 16, border: '1px solid rgba(226,232,240,.9)', background: '#f8fafc' },
   clickable: { cursor: 'pointer' },
-  shipGrid: { display: 'grid', gridTemplateColumns: 'minmax(260px, .95fr) minmax(0, 1.4fr)', gap: 20, marginTop: 18 },
+  shipGrid: { display: 'grid', gridTemplateColumns: 'minmax(260px, .82fr) minmax(0, 1.38fr)', gap: 22, marginTop: 18, alignItems: 'start' },
   shipList: { display: 'grid', gap: 12 },
-  shipButton: { width: '100%', textAlign: 'left', padding: 14, borderRadius: 16, border: '1px solid rgba(226,232,240,.9)', background: '#f8fafc', cursor: 'pointer' },
-  tracker: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 18 },
+  shipButton: { width: '100%', textAlign: 'left', padding: 16, borderRadius: 18, border: '1px solid rgba(226,232,240,.9)', background: '#f8fafc', cursor: 'pointer', display: 'grid', gap: 10 },
+  shipButtonMeta: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10, alignItems: 'center' },
+  shipmentDetailCard: { padding: 22, borderRadius: 22, border: '1px solid rgba(191,219,254,.95)', background: 'linear-gradient(180deg, rgba(255,255,255,.98), rgba(239,246,255,.82))', boxShadow: '0 18px 34px rgba(37,99,235,.08)', display: 'grid', gap: 18, minHeight: 320 },
+  shipmentHeader: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' },
+  shipmentMetaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 },
+  shipmentMetaCard: { padding: 14, borderRadius: 16, border: '1px solid rgba(191,219,254,.76)', background: 'rgba(255,255,255,.88)' },
+  tracker: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 },
+  trackerNode: { display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' },
+  trackerRail: { width: '100%', display: 'grid', gridTemplateColumns: '40px 1fr', alignItems: 'center', gap: 10 },
+  trackerLabel: { display: 'grid', gap: 4 },
   trustGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 18 },
   trustBlock: {
     padding: 28,
@@ -123,6 +131,12 @@ function getShipmentStep(logisticsItem) {
   if (logisticsItem.tracking_stage === 'transport' || logisticsItem.status === 'in_transit') return 2
   if (logisticsItem.tracking_stage === 'warehouse' || logisticsItem.tracking_stage === 'delivery' || logisticsItem.status === 'shipped') return 1
   return 0
+}
+
+function getShipmentTone(status) {
+  if (status === 'delivered') return tones.emerald
+  if (status === 'in_transit' || status === 'shipped') return tones.blue
+  return tones.violet
 }
 
 function DashboardPage() {
@@ -203,10 +217,10 @@ function DashboardPage() {
   const summary = useMemo(() => {
     const activeEnquiries = conversations.filter((item) => item.status !== 'closed').length
     const shipmentsInProgress = logistics.filter((item) => item.status !== 'delivered').length
-    return { totalOrders: orders.length, activeEnquiries, shipmentsInProgress }
+    const confirmedOrders = orders.filter((item) => item.status === 'confirmed').length
+    return { totalOrders: orders.length, activeEnquiries, shipmentsInProgress, confirmedOrders }
   }, [conversations, logistics, orders])
 
-  const revenue = useMemo(() => formatCurrency(orders.reduce((sum, item) => sum + Number(item.total_amount || 0), 0)), [orders])
   const recentEnquiries = useMemo(() => conversations.slice(0, 3), [conversations])
   const latestProducts = useMemo(() => [...products].sort((a, b) => Number(b.id || 0) - Number(a.id || 0)).slice(0, 3), [products])
 
@@ -274,19 +288,19 @@ function DashboardPage() {
 
           <div style={S.statsWrap}>
             <h2 style={S.sectionTitle}>Performance Overview</h2>
-            <p style={S.sectionText}>Real-time marketplace signals across buyer order flow, enquiry activity, logistics execution, and commercial performance.</p>
+            <p style={S.sectionText}>Real-time buyer signals across order flow, enquiry momentum, logistics execution, and confirmed trade progress.</p>
             <div style={S.statsGrid}>
               <article style={S.stat}><IconWrap><ChartIcon /></IconWrap><div style={{ marginTop: 16, fontSize: '1.9rem', fontWeight: 800, color: '#0f172a' }}>{summary.totalOrders}</div><div style={{ marginTop: 6, fontWeight: 700, color: '#334155' }}>Total Orders</div><div style={{ marginTop: 6, color: '#64748b' }}>Buyer orders created from your account.</div></article>
               <article style={S.stat}><IconWrap tone="amber"><InboxIcon /></IconWrap><div style={{ marginTop: 16, fontSize: '1.9rem', fontWeight: 800, color: '#0f172a' }}>{summary.activeEnquiries}</div><div style={{ marginTop: 6, fontWeight: 700, color: '#334155' }}>Active Enquiries</div><div style={{ marginTop: 6, color: '#64748b' }}>Open conversations awaiting closure.</div></article>
               <article style={S.stat}><IconWrap tone="violet"><TruckIcon /></IconWrap><div style={{ marginTop: 16, fontSize: '1.9rem', fontWeight: 800, color: '#0f172a' }}>{summary.shipmentsInProgress}</div><div style={{ marginTop: 6, fontWeight: 700, color: '#334155' }}>Shipments In Progress</div><div style={{ marginTop: 6, color: '#64748b' }}>Live shipments that have not reached delivery.</div></article>
-              {revenue ? <article style={S.stat}><IconWrap tone="emerald"><DollarIcon /></IconWrap><div style={{ marginTop: 16, fontSize: '1.9rem', fontWeight: 800, color: '#0f172a' }}>{revenue}</div><div style={{ marginTop: 6, fontWeight: 700, color: '#334155' }}>Revenue</div><div style={{ marginTop: 6, color: '#64748b' }}>Total order value captured from buyer orders.</div></article> : null}
+              <article style={S.stat}><IconWrap tone="emerald"><CheckIcon /></IconWrap><div style={{ marginTop: 16, fontSize: '1.9rem', fontWeight: 800, color: '#0f172a' }}>{summary.confirmedOrders}</div><div style={{ marginTop: 6, fontWeight: 700, color: '#334155' }}>Confirmed Orders</div><div style={{ marginTop: 6, color: '#64748b' }}>Orders already accepted and confirmed by suppliers.</div></article>
             </div>
           </div>
         </div>
       </div>
 
       <div style={S.mainGrid}>
-        <div style={S.rowGrid}>
+        <div style={S.fullRow}>
           <div style={{ ...S.card, ...S.section }}>
             <h2 style={S.sectionTitle}>Recent Enquiries</h2>
             <p style={S.sectionText}>Your latest buyer enquiries with quick status visibility.</p>
@@ -336,45 +350,70 @@ function DashboardPage() {
           </aside>
         </div>
 
-        <div style={S.rowGrid}>
+        <div style={S.fullRow}>
           <div style={{ ...S.card, ...S.section }}>
             <h2 style={S.sectionTitle}>Shipment Tracker</h2>
             <p style={S.sectionText}>Select a live shipment to inspect its current delivery stage.</p>
             {logistics.length === 0 ? <div style={S.list}><EmptyState text="No shipments found" /></div> : (
               <div style={S.shipGrid}>
                 <div style={S.shipList}>
-                  {logistics.map((item) => (
-                    <button key={item.id} onClick={() => setSelectedShipmentId(item.id)} style={{ ...S.shipButton, background: String(selectedShipmentId) === String(item.id) ? 'rgba(239,246,255,.96)' : '#f8fafc', borderColor: String(selectedShipmentId) === String(item.id) ? '#93c5fd' : 'rgba(226,232,240,.9)' }} type="button">
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>Shipment #{item.id}</div>
-                      <div style={{ marginTop: 6, color: '#475569' }}>Order #{item.order}</div>
-                      <div style={{ marginTop: 8 }}><span style={badge(item.status === 'delivered' ? tones.emerald.background : tones.violet.background, item.status === 'delivered' ? tones.emerald.color : tones.violet.color)}>{String(item.status || 'pending').replaceAll('_', ' ')}</span></div>
-                    </button>
-                  ))}
+                  {logistics.map((item) => {
+                    const tone = getShipmentTone(item.status)
+                    const selected = String(selectedShipmentId) === String(item.id)
+
+                    return (
+                      <button key={item.id} onClick={() => setSelectedShipmentId(item.id)} style={{ ...S.shipButton, background: selected ? 'rgba(239,246,255,.96)' : '#f8fafc', borderColor: selected ? '#93c5fd' : 'rgba(226,232,240,.9)', boxShadow: selected ? '0 14px 28px rgba(37,99,235,.08)' : 'none' }} type="button">
+                        <div style={S.shipButtonMeta}>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>Shipment #{item.id}</div>
+                          <span style={badge(tone.background, tone.color)}>{String(item.status || 'pending').replaceAll('_', ' ')}</span>
+                        </div>
+                        <div style={{ color: '#475569' }}>Order #{item.order}</div>
+                        <div style={{ color: '#64748b', fontSize: '.92rem' }}>Current location: {item.location || 'No data available'}</div>
+                      </button>
+                    )
+                  })}
                 </div>
 
-                <div style={{ ...S.item, minHeight: 240 }}>
+                <div style={S.shipmentDetailCard}>
                   {shipmentLoading ? <Spinner label="Loading shipment..." /> : null}
                   {!shipmentLoading && activeShipment ? (
                     <>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
+                      <div style={S.shipmentHeader}>
                         <div>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>Shipment #{activeShipment.id}</div>
-                          <div style={{ marginTop: 6, color: '#64748b' }}>Order #{activeShipment.order}</div>
-                          <div style={{ marginTop: 6, color: '#64748b' }}>Location: {activeShipment.location || 'No data available'}</div>
+                          <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0f172a' }}>Shipment #{activeShipment.id}</div>
+                          <div style={{ marginTop: 8, color: '#475569', lineHeight: 1.6 }}>Track the current delivery milestone for Order #{activeShipment.order} from one focused buyer view.</div>
                         </div>
                         <button className="button secondary" onClick={() => navigate(`/shipments/${activeShipment.id}`)} type="button">Open Shipment</button>
+                      </div>
+                      <div style={S.shipmentMetaGrid}>
+                        <div style={S.shipmentMetaCard}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#64748b' }}>Order</div>
+                          <div style={{ marginTop: 8, fontWeight: 700, color: '#0f172a' }}>#{activeShipment.order}</div>
+                        </div>
+                        <div style={S.shipmentMetaCard}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#64748b' }}>Status</div>
+                          <div style={{ marginTop: 8 }}><span style={badge(getShipmentTone(activeShipment.status).background, getShipmentTone(activeShipment.status).color)}>{String(activeShipment.status || 'pending').replaceAll('_', ' ')}</span></div>
+                        </div>
+                        <div style={S.shipmentMetaCard}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#64748b' }}>Location</div>
+                          <div style={{ marginTop: 8, fontWeight: 700, color: '#0f172a' }}>{activeShipment.location || 'No data available'}</div>
+                        </div>
+                        <div style={S.shipmentMetaCard}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#64748b' }}>Mode</div>
+                          <div style={{ marginTop: 8, fontWeight: 700, color: '#0f172a' }}>{activeShipment.shipping_mode ? String(activeShipment.shipping_mode).replaceAll('_', ' ') : 'Not selected'}</div>
+                        </div>
                       </div>
                       <div style={S.tracker}>
                         {['Order Placed', 'Dispatched', 'In Transit', 'Delivered'].map((label, index) => {
                           const active = shipmentStep === index
-                          const done = shipmentStep > index || (shipmentStep === index && label === 'Delivered')
+                          const done = shipmentStep > index || activeShipment.status === 'delivered'
                           return (
-                            <div key={label} style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
-                              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: active ? '#2563eb' : done ? '#0f766e' : '#e2e8f0', color: active || done ? '#fff' : '#64748b', fontWeight: 800 }}>{done ? '✓' : active ? '●' : '○'}</div>
-                                <div style={{ height: 4, width: '100%', borderRadius: 999, background: done || active ? 'linear-gradient(90deg,#2563eb,#14b8a6)' : '#e2e8f0' }} />
+                            <div key={label} style={S.trackerNode}>
+                              <div style={S.trackerRail}>
+                                <div style={{ width: 40, height: 40, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: active ? '#2563eb' : done ? '#0f766e' : '#e2e8f0', color: active || done ? '#fff' : '#64748b', fontWeight: 800, fontSize: '.72rem' }}>{done ? 'OK' : active ? 'NOW' : index + 1}</div>
+                                <div style={{ height: 5, width: '100%', borderRadius: 999, background: index === 3 ? 'transparent' : done || active ? 'linear-gradient(90deg,#2563eb,#14b8a6)' : '#e2e8f0' }} />
                               </div>
-                              <div><div style={{ fontWeight: 700, color: '#0f172a' }}>{label}</div><div style={{ marginTop: 4, color: '#64748b', fontSize: '.88rem' }}>{active ? 'Current stage' : done ? 'Completed' : 'Queued'}</div></div>
+                              <div style={S.trackerLabel}><div style={{ fontWeight: 700, color: '#0f172a' }}>{label}</div><div style={{ color: '#64748b', fontSize: '.88rem' }}>{active ? 'Current stage' : done ? 'Completed' : 'Queued'}</div></div>
                             </div>
                           )
                         })}
@@ -386,8 +425,7 @@ function DashboardPage() {
             )}
           </div>
 
-          <div style={S.contentGrid}>
-            <div style={{ ...S.card, ...S.section }}>
+          <div style={{ ...S.card, ...S.section }}>
               <h2 style={S.sectionTitle}>Latest Products</h2>
               <p style={S.sectionText}>Top live products from the marketplace.</p>
               {latestProducts.length === 0 ? <div style={S.list}><EmptyState text="No data available" /></div> : (
@@ -406,13 +444,6 @@ function DashboardPage() {
                   ))}
                 </div>
               )}
-            </div>
-
-            <div style={{ ...S.card, ...S.section }}>
-              <h2 style={S.sectionTitle}>Recommended Suppliers</h2>
-              <p style={S.sectionText}>Real recommendations appear here when backend supplier recommendation logic is available.</p>
-              <div style={S.list}><EmptyState text="No data available" /></div>
-            </div>
           </div>
         </div>
       </div>
@@ -450,7 +481,6 @@ function CubeIcon() { return <SvgIcon><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 
 function MessageIcon() { return <SvgIcon><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H10l-4 4v-4.5A2.5 2.5 0 0 1 5 12.5v-6Z" /></SvgIcon> }
 function TruckIcon() { return <SvgIcon><path d="M3 7h11v8H3z" /><path d="M14 10h3l3 3v2h-6" /><circle cx="7.5" cy="17.5" r="1.5" /><circle cx="17.5" cy="17.5" r="1.5" /></SvgIcon> }
 function ChartIcon() { return <SvgIcon><path d="M4 19h16" /><path d="M7 16V9" /><path d="M12 16V5" /><path d="M17 16v-4" /></SvgIcon> }
-function DollarIcon() { return <SvgIcon><path d="M12 3v18" /><path d="M16 7.5c0-1.9-1.8-3.5-4-3.5s-4 1.6-4 3.5 1.8 3.5 4 3.5 4 1.6 4 3.5-1.8 3.5-4 3.5-4-1.6-4-3.5" /></SvgIcon> }
 function InboxIcon() { return <SvgIcon><path d="M4 13.5V6.8A1.8 1.8 0 0 1 5.8 5h12.4A1.8 1.8 0 0 1 20 6.8v6.7" /><path d="M4 13.5h4.2l1.8 2.5h4l1.8-2.5H20" /><path d="M4 13.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.5" /></SvgIcon> }
 function ShieldIcon() { return <SvgIcon><path d="M12 3 5.5 5.8v5.1c0 4 2.8 7.7 6.5 9.1 3.7-1.4 6.5-5.1 6.5-9.1V5.8L12 3Z" /><path d="m9.5 11.8 1.8 1.8 3.4-3.8" /></SvgIcon> }
 function LockIcon() { return <SvgIcon><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V8a4 4 0 0 1 8 0v2" /></SvgIcon> }
