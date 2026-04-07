@@ -1,102 +1,177 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import ConversationList from './components/ConversationList'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
+import './App.css'
+import { useAuth } from './context/AuthContext'
 import AddProductPage from './pages/AddProductPage'
 import ChatPage from './pages/ChatPage'
 import DashboardPage from './pages/DashboardPage'
-import LoginPage from './pages/LoginPage'
+import Enquiries from './pages/Enquiries'
 import LogisticsPage from './pages/LogisticsPage'
+import LoginPage from './pages/LoginPage'
 import MarketplacePage from './pages/MarketplacePage'
+import Orders from './pages/Orders'
 import OrdersPage from './pages/OrdersPage'
 import ProductDetailsPage from './pages/ProductDetailsPage'
+import Products from './pages/Products'
 import ProductsPage from './pages/ProductsPage'
 import RegisterPage from './pages/RegisterPage'
-import { useAuth } from './context/AuthContext'
-import './App.css'
-import ConversationList from './components/ConversationList'  // ✅ already added
+import Shipments from './pages/Shipments'
+import SupplierDashboard from './pages/SupplierDashboard'
 
 function AppLayout() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, role } = useAuth()
 
   return (
     <main className="app-shell">
       {isAuthenticated ? <Navbar /> : null}
       <div className="container">
         <Routes>
-          <Route path="/" element={<MarketplacePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route element={<MarketplacePage />} path="/" />
+          <Route element={<LoginPage />} path="/login" />
+          <Route element={<RegisterPage />} path="/register" />
 
-          {/* 🔥 NEW ROUTE (ADD THIS) */}
           <Route
-            path="/conversations"
             element={
               <ProtectedRoute>
                 <ConversationList />
               </ProtectedRoute>
             }
+            path="/conversations"
           />
           <Route
-            path="/conversations/:id"
             element={
               <ProtectedRoute>
                 <ChatPage />
               </ProtectedRoute>
             }
+            path="/conversations/:id"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+            path="/enquiry/:id"
           />
 
           <Route
-            path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardPage />
+                {role === 'supplier' ? <SupplierDashboard /> : <DashboardPage />}
               </ProtectedRoute>
             }
+            path="/dashboard"
           />
           <Route
-            path="/products"
             element={
               <ProtectedRoute>
                 <ProductsPage />
               </ProtectedRoute>
             }
+            path="/products"
           />
           <Route
-            path="/logistics"
             element={
               <ProtectedRoute>
                 <LogisticsPage />
               </ProtectedRoute>
             }
+            path="/logistics"
           />
           <Route
-            path="/products/:productId"
             element={
               <ProtectedRoute>
                 <ProductDetailsPage />
               </ProtectedRoute>
             }
+            path="/products/:productId"
           />
           <Route
-            path="/orders"
+            element={
+              <ProtectedRoute>
+                <ProductDetailsPage />
+              </ProtectedRoute>
+            }
+            path="/product/:productId"
+          />
+          <Route
             element={
               <ProtectedRoute>
                 <OrdersPage />
               </ProtectedRoute>
             }
+            path="/orders"
           />
           <Route
-            path="/add-product"
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+            path="/orders/:id"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+            path="/shipments/:id"
+          />
+          <Route
             element={
               <ProtectedRoute allowedRoles={['supplier']}>
                 <AddProductPage />
               </ProtectedRoute>
             }
+            path="/add-product"
+          />
+
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <Products />
+              </ProtectedRoute>
+            }
+            path="/supplier/products"
           />
           <Route
-            path="*"
-            element={<Navigate replace to={isAuthenticated ? '/dashboard' : '/'} />}
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <Enquiries />
+              </ProtectedRoute>
+            }
+            path="/supplier/enquiries"
           />
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <Enquiries />
+              </ProtectedRoute>
+            }
+            path="/supplier/enquiries/:enquiryId"
+          />
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <Orders />
+              </ProtectedRoute>
+            }
+            path="/supplier/orders"
+          />
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <Shipments />
+              </ProtectedRoute>
+            }
+            path="/supplier/shipments"
+          />
+
+          <Route element={<Navigate replace to={isAuthenticated ? '/dashboard' : '/'} />} path="*" />
         </Routes>
       </div>
     </main>

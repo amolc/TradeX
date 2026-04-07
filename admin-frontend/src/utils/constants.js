@@ -7,6 +7,8 @@ export const adminNavItems = [
   { to: '/', label: 'Overview' },
   { to: '/users', label: 'Users' },
   { to: '/inquiries', label: 'Inquiries' },
+  { to: '/orders', label: 'Orders' },
+  { to: '/shipments', label: 'Shipments' },
   { to: '/products', label: 'Listings' },
   { to: '/conversations', label: 'Chat' },
   { to: '/activity', label: 'Activity' },

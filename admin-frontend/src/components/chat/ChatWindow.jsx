@@ -1,7 +1,7 @@
 import ChatComposer from './ChatComposer'
 import MessageBubble from './MessageBubble'
 
-export default function ChatWindow({ conversation, messages, onSend, sending }) {
+export default function ChatWindow({ conversation, messages, onSend, sending, readOnly = false }) {
   return (
     <div className="panel chat-window">
       <div className="chat-window-header">
@@ -18,7 +18,10 @@ export default function ChatWindow({ conversation, messages, onSend, sending }) 
           />
         ))}
       </div>
-      {conversation ? <ChatComposer disabled={sending} onSend={onSend} /> : null}
+      {conversation && !readOnly ? <ChatComposer disabled={sending} onSend={onSend} /> : null}
+      {conversation && readOnly ? (
+        <div className="chat-monitor-note">Admin monitor is read-only so buyer and supplier identities stay intact.</div>
+      ) : null}
     </div>
   )
 }

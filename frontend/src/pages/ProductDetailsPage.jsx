@@ -86,7 +86,7 @@ function ProductDetailsPage() {
         <div className="details-grid">
           <div className="details-panel">
             <h3>{product.name}</h3>
-            <p>Price: {product.price}</p>
+            <p>Price: Rs. {product.price}</p>
             <p>Available Quantity: {product.quantity}</p>
             <p>Supplier: {product.supplier?.name || product.supplier?.email || 'N/A'}</p>
           </div>

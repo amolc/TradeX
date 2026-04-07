@@ -10,6 +10,23 @@ function Navbar() {
     navigate('/login')
   }
 
+  const supplierLinks = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/supplier/enquiries', label: 'Enquiries' },
+    { to: '/supplier/orders', label: 'Orders' },
+    { to: '/supplier/shipments', label: 'Shipments' },
+    { to: '/supplier/products', label: 'Products' },
+  ]
+
+  const buyerLinks = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/products', label: 'Marketplace' },
+    { to: '/logistics', label: 'Logistics' },
+    { to: '/orders', label: 'Requests' },
+  ]
+
+  const navLinks = role === 'supplier' ? supplierLinks : buyerLinks
+
   return (
     <header className="navbar">
       <div>
@@ -23,48 +40,17 @@ function Navbar() {
       </div>
 
       <nav className="navbar-actions">
-        <NavLink
-          className={({ isActive }) =>
-            `button ${isActive ? 'active' : 'secondary'}`
-          }
-          to="/dashboard"
-        >
-          Dashboard
-        </NavLink>
-        <NavLink
-          className={({ isActive }) =>
-            `button ${isActive ? 'active' : 'secondary'}`
-          }
-          to="/products"
-        >
-          Marketplace
-        </NavLink>
-        <NavLink
-          className={({ isActive }) =>
-            `button ${isActive ? 'active' : 'secondary'}`
-          }
-          to="/logistics"
-        >
-          Logistics
-        </NavLink>
-        <NavLink
-          className={({ isActive }) =>
-            `button ${isActive ? 'active' : 'secondary'}`
-          }
-          to="/orders"
-        >
-          Requests
-        </NavLink>
-        {role === 'supplier' ? (
+        {navLinks.map((item) => (
           <NavLink
+            key={item.to}
             className={({ isActive }) =>
               `button ${isActive ? 'active' : 'secondary'}`
             }
-            to="/add-product"
+            to={item.to}
           >
-            Add Product
+            {item.label}
           </NavLink>
-        ) : null}
+        ))}
         <button className="button secondary" onClick={handleLogout} type="button">
           Logout
         </button>

@@ -1,36 +1,53 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import ChatList from '../../components/chat/ChatList'
 import ChatWindow from '../../components/chat/ChatWindow'
 import PageHeader from '../../components/ui/PageHeader'
 import { usePolling } from '../../hooks/usePolling'
-import {
-  getAdminConversations,
-  getConversationMessages,
-  sendConversationMessage,
-} from '../../services/conversationService'
+import { getAdminConversations, getConversationMessages } from '../../services/conversationService'
 
 export default function AdminChatPage() {
+  const [searchParams] = useSearchParams()
   const [conversations, setConversations] = useState([])
   const [selectedConversation, setSelectedConversation] = useState(null)
   const [messages, setMessages] = useState([])
-  const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const targetConversationId = Number(searchParams.get('conversation'))
 
   const loadConversations = useCallback(async () => {
     try {
       const response = await getAdminConversations()
       setConversations(response)
 
-      if (!selectedConversation && response.length) {
-        setSelectedConversation(response[0])
+      if (!response.length) {
+        setSelectedConversation(null)
+        return
       }
+
+      const matchedConversation = targetConversationId
+        ? response.find((item) => item.id === targetConversationId)
+        : null
+
+      if (matchedConversation) {
+        setSelectedConversation(matchedConversation)
+        return
+      }
+
+      setSelectedConversation((current) => {
+        if (current) {
+          return response.find((item) => item.id === current.id) || response[0]
+        }
+
+        return response[0]
+      })
     } catch {
       setError('Could not load conversations.')
     }
-  }, [selectedConversation])
+  }, [targetConversationId])
 
   const loadMessages = useCallback(async () => {
     if (!selectedConversation) {
+      setMessages([])
       return
     }
 
@@ -55,7 +72,7 @@ export default function AdminChatPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="View active conversations and respond from one shared WhatsApp-style workspace."
+        description="Monitor live buyer-supplier threads from one shared workspace without injecting admin messages into the deal flow."
         eyebrow="Messaging"
         title="Conversation Monitor"
       />
@@ -71,23 +88,8 @@ export default function AdminChatPage() {
         <ChatWindow
           conversation={selectedConversation}
           messages={messages}
-          onSend={async (text) => {
-            if (!selectedConversation) {
-              return
-            }
-
-            setSending(true)
-
-            try {
-              await sendConversationMessage(selectedConversation.id, {
-                message_text: text,
-              })
-              loadMessages()
-            } finally {
-              setSending(false)
-            }
-          }}
-          sending={sending}
+          readOnly
+          sending={false}
         />
       </div>
     </div>

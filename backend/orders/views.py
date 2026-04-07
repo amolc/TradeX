@@ -6,7 +6,7 @@ from logistics.models import Logistics
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny   # 👈 CHANGED HERE
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from users.models import User
 from users.services import get_marketplace_profile
@@ -21,17 +21,33 @@ from .serializers import (
 )
 
 
+def is_admin_user(user):
+    return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+
+
 class ConversationViewSet(viewsets.ModelViewSet):
-    authentication_classes = []
-    permission_classes = [AllowAny]   # 👈 CHANGED HERE
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # TEMPORARY TESTING ONLY
-        return Conversation.objects.all().select_related(
+        user = self.request.user
+        profile = get_marketplace_profile(user)
+        queryset = Conversation.objects.select_related(
             "buyer", "supplier", "product"
-        ).prefetch_related(
-            "messages",
-        )
+        ).prefetch_related("messages")
+
+        if is_admin_user(user):
+            return queryset
+
+        if not profile:
+            return queryset.none()
+
+        if profile.role == "buyer":
+            return queryset.filter(buyer=profile)
+
+        if profile.role == "supplier":
+            return queryset.filter(supplier=profile)
+
+        return queryset.none()
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -48,11 +64,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile or profile.role != "buyer":
             raise PermissionDenied("Only buyers can create inquiries")
@@ -103,25 +115,22 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get", "post"], url_path="messages")
     def messages(self, request, pk=None):
         conversation = self.get_object()
+        profile = get_marketplace_profile(request.user)
+        admin_user = is_admin_user(request.user)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            profile = (
-                User.objects.filter(pk=conversation.buyer_id).first()
-                or User.objects.filter(role="buyer").first()
-            )
-
-        if not profile:
+        if not profile and not admin_user:
             raise PermissionDenied("Authenticated marketplace profile is required")
 
-        if profile.id not in {conversation.buyer_id, conversation.supplier_id}:
+        if not admin_user and profile.id not in {conversation.buyer_id, conversation.supplier_id}:
             raise PermissionDenied("Only conversation participants can access messages")
 
         if request.method.lower() == "get":
             queryset = conversation.messages.select_related("sender").order_by("created_at")
             output = MessageSerializer(queryset, many=True, context={"request": request})
             return Response(output.data, status=status.HTTP_200_OK)
+
+        if admin_user:
+            raise PermissionDenied("Admin can monitor conversations but cannot send messages")
 
         payload = request.data.copy()
         payload["conversation_id"] = conversation.id
@@ -157,7 +166,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.GenericViewSet):
-    permission_classes = [AllowAny]   # 👈 CHANGED HERE
+    permission_classes = [IsAuthenticated]
     serializer_class = MessageSerializer
 
     def get_serializer_class(self):
@@ -169,11 +178,7 @@ class MessageViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile:
             raise PermissionDenied("Authenticated marketplace profile is required")
@@ -210,11 +215,7 @@ class MessageViewSet(viewsets.GenericViewSet):
         serializer = AcceptOfferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile:
             raise PermissionDenied("Authenticated marketplace profile is required")
@@ -258,31 +259,28 @@ class MessageViewSet(viewsets.GenericViewSet):
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    # TEMPORARY TESTING ONLY
-    authentication_classes = []
     serializer_class = OrderSerializer
-    permission_classes = [AllowAny]   # 👈 OPTIONAL (you can keep IsAuthenticated if you want)
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         auth_user = self.request.user
         profile = get_marketplace_profile(auth_user)
+        queryset = Order.objects.select_related("user", "product")
+
+        if is_admin_user(auth_user):
+            return queryset
 
         if profile and profile.role == "buyer":
-            return Order.objects.filter(user=profile).select_related("user", "product")
+            return queryset.filter(user=profile)
 
         if profile and profile.role == "supplier":
-            return Order.objects.filter(product__supplier=auth_user).select_related("user", "product")
+            return queryset.filter(product__supplier=auth_user)
 
-        return Order.objects.all().select_related("user", "product")
+        return queryset.none()
 
     def perform_create(self, serializer):
-        if getattr(self.request.user, "is_authenticated", False):
-            auth_user = self.request.user
-            profile = get_marketplace_profile(auth_user)
-        else:
-            # TEMPORARY TESTING ONLY
-            auth_user = None
-            profile = User.objects.filter(role="buyer").first()
+        auth_user = self.request.user
+        profile = get_marketplace_profile(auth_user)
 
         if not profile or profile.role != "buyer":
             raise PermissionDenied("Only buyers can create enquiries or orders")
@@ -292,7 +290,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order_type = serializer.validated_data.get("order_type", Order.TYPE_ORDER)
         shipping_mode = serializer.validated_data.get("shipping_mode", "")
 
-        if auth_user and product.supplier_id == auth_user.id:
+        if product.supplier_id == auth_user.id:
             raise ValidationError("You cannot create a request for your own product")
 
         if quantity <= 0:
@@ -367,19 +365,22 @@ class OrderViewSet(viewsets.ModelViewSet):
             location="Supplier",
         )
 
+    def perform_update(self, serializer):
+        if not is_admin_user(self.request.user):
+            raise PermissionDenied("Only admins can edit order records directly")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        raise PermissionDenied("Orders cannot be deleted from the API")
+
     @action(detail=True, methods=["post"])
     def supplier_action(self, request, pk=None):
         profile = get_marketplace_profile(request.user)
         order = self.get_object()
+        user = request.user
 
-        if getattr(request.user, "is_authenticated", False):
-            user = request.user
-        else:
-            # TEMPORARY TESTING ONLY
-            user = order.product.supplier
-
-        # TEMPORARY TESTING ONLY
-        if False:
+        if not profile or profile.role != "supplier":
             raise PermissionDenied("Only suppliers can respond to enquiries or confirm orders")
 
         if order.product.supplier_id != user.id:
@@ -402,6 +403,42 @@ class OrderViewSet(viewsets.ModelViewSet):
             order.supplier_response = response_message
 
         order.save(update_fields=["status", "supplier_response"])
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="admin-update")
+    def admin_update(self, request, pk=None):
+        if not is_admin_user(request.user):
+            raise PermissionDenied("Only admins can update order workflow")
+
+        order = self.get_object()
+        status_value = str(request.data.get("status", "")).strip().lower()
+        response_message = str(request.data.get("supplier_response", "")).strip()
+        shipping_mode = str(request.data.get("shipping_mode", "")).strip().lower()
+        updated_fields = []
+
+        valid_statuses = {choice[0] for choice in Order.STATUS_CHOICES}
+        valid_shipping_modes = {choice[0] for choice in Order.SHIPPING_CHOICES}
+
+        if status_value:
+            if status_value not in valid_statuses:
+                raise ValidationError({"status": "Invalid order status."})
+            order.status = status_value
+            updated_fields.append("status")
+
+        if response_message:
+            order.supplier_response = response_message
+            updated_fields.append("supplier_response")
+
+        if shipping_mode:
+            if shipping_mode not in valid_shipping_modes:
+                raise ValidationError({"shipping_mode": "Invalid shipping mode."})
+            order.shipping_mode = shipping_mode
+            updated_fields.append("shipping_mode")
+
+        if not updated_fields:
+            raise ValidationError("Provide at least one field to update.")
+
+        order.save(update_fields=updated_fields)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
@@ -430,7 +467,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         return Response(
             {
-                "scope": profile.role if profile else "all",
+                "scope": "admin" if is_admin_user(request.user) else profile.role if profile else "all",
                 "total_requests": totals["total_requests"] or 0,
                 "total_value": totals["total_value"] or 0,
                 "status_counts": status_counts,

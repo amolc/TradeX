@@ -82,6 +82,14 @@ export function addProduct(data) {
   return api.post('products/', data)
 }
 
+export function updateProduct(productId, data) {
+  return api.patch(`products/${productId}/`, data)
+}
+
+export function deleteProduct(productId) {
+  return api.delete(`products/${productId}/`)
+}
+
 export function getOrders() {
   return api.get('orders/')
 }
@@ -96,6 +104,18 @@ export function runSupplierAction(orderId, data) {
 
 export function getOrderAnalytics() {
   return api.get('orders/analytics/')
+}
+
+export function getConversations() {
+  return api.get('conversations/')
+}
+
+export function getConversationMessages(conversationId) {
+  return api.get(`conversations/${conversationId}/messages/`)
+}
+
+export function respondToConversation(conversationId, data) {
+  return api.post(`conversations/${conversationId}/messages/`, data)
 }
 
 export function getLogistics() {
