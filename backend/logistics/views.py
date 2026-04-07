@@ -7,20 +7,28 @@ from .models import Logistics, LogisticsInquiry
 from .serializers import LogisticsInquirySerializer, LogisticsSerializer
 
 
+def is_admin_user(user):
+    return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+
+
 class LogisticsViewSet(viewsets.ModelViewSet):
     serializer_class = LogisticsSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        profile = get_marketplace_profile(self.request.user)
+        user = self.request.user
+        profile = get_marketplace_profile(user)
+
+        if is_admin_user(user):
+            return Logistics.objects.all().select_related("order", "order__user", "order__product")
 
         if profile and profile.role == "buyer":
-            return Logistics.objects.filter(order__user=profile).select_related("order")
+            return Logistics.objects.filter(order__user=profile).select_related("order", "order__product")
 
         if profile and profile.role == "supplier":
-            return Logistics.objects.filter(order__product__supplier=self.request.user).select_related("order")
+            return Logistics.objects.filter(order__product__supplier=user).select_related("order", "order__user", "order__product")
 
-        return Logistics.objects.all().select_related("order")
+        return Logistics.objects.none()
 
     def perform_create(self, serializer):
         raise PermissionDenied("Logistics records are created automatically from orders")
@@ -29,8 +37,12 @@ class LogisticsViewSet(viewsets.ModelViewSet):
         profile = get_marketplace_profile(self.request.user)
         order = serializer.instance.order
 
+        if is_admin_user(self.request.user):
+            serializer.save()
+            return
+
         if not profile or profile.role != "supplier":
-            raise PermissionDenied("Only suppliers can update shipment tracking")
+            raise PermissionDenied("Only suppliers or admins can update shipment tracking")
 
         if order.product.supplier_id != self.request.user.id:
             raise PermissionDenied("You can only update logistics for your own orders")
@@ -48,7 +60,11 @@ class LogisticsInquiryViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
-        profile = get_marketplace_profile(self.request.user)
+        user = self.request.user
+        profile = get_marketplace_profile(user)
+
+        if is_admin_user(user):
+            return LogisticsInquiry.objects.all().order_by("-created_at")
 
         if profile and profile.role == "buyer":
             return LogisticsInquiry.objects.filter(email__iexact=profile.email).order_by(

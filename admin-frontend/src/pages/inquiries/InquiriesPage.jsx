@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
-import InquiryReplyForm from '../../components/forms/InquiryReplyForm'
+import { useNavigate } from 'react-router-dom'
 import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
-import { getAdminInquiries, respondToInquiry } from '../../services/inquiryService'
+import { getAdminInquiries } from '../../services/inquiryService'
 import { formatDateTime } from '../../utils/formatters'
 
 export default function InquiriesPage() {
+  const navigate = useNavigate()
   const [inquiries, setInquiries] = useState([])
-  const [replyingId, setReplyingId] = useState(null)
   const [error, setError] = useState('')
-  const [sending, setSending] = useState(false)
 
   const loadInquiries = async () => {
     setError('')
@@ -55,7 +54,7 @@ export default function InquiriesPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="Monitor all buyer inquiries, open response flows, and keep supplier follow-up moving."
+        description="Monitor all buyer enquiries, then jump into linked conversations or the broader orders queue for escalation."
         eyebrow="Workflow"
         title="Inquiry Management"
       />
@@ -64,39 +63,28 @@ export default function InquiriesPage() {
 
       <DataTable
         actions={(row) => (
-          <button
-            className="button button-primary"
-            onClick={() => setReplyingId((current) => (current === row.id ? null : row.id))}
-            type="button"
-          >
-            {replyingId === row.id ? 'Close' : 'Respond'}
-          </button>
+          <div className="table-actions">
+            {row.conversation_id ? (
+              <button
+                className="button button-primary"
+                onClick={() => navigate(`/conversations?conversation=${row.conversation_id}`)}
+                type="button"
+              >
+                Open Chat
+              </button>
+            ) : null}
+            <button
+              className="button button-secondary"
+              onClick={() => navigate('/orders')}
+              type="button"
+            >
+              Review Orders
+            </button>
+          </div>
         )}
         columns={columns}
         rows={inquiries}
       />
-
-      {replyingId ? (
-        <section className="panel">
-          <h3 className="panel-title">Respond to Inquiry #{replyingId}</h3>
-          <InquiryReplyForm
-            loading={sending}
-            onSubmit={async (payload) => {
-              setSending(true)
-
-              try {
-                await respondToInquiry(replyingId, payload)
-                setReplyingId(null)
-                loadInquiries()
-              } catch {
-                setError('Could not send the response.')
-              } finally {
-                setSending(false)
-              }
-            }}
-          />
-        </section>
-      ) : null}
     </div>
   )
 }

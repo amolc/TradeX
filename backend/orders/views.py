@@ -21,14 +21,22 @@ from .serializers import (
 )
 
 
+def is_admin_user(user):
+    return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+
+
 class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        profile = get_marketplace_profile(self.request.user)
+        user = self.request.user
+        profile = get_marketplace_profile(user)
         queryset = Conversation.objects.select_related(
             "buyer", "supplier", "product"
         ).prefetch_related("messages")
+
+        if is_admin_user(user):
+            return queryset
 
         if not profile:
             return queryset.none()
@@ -108,17 +116,21 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def messages(self, request, pk=None):
         conversation = self.get_object()
         profile = get_marketplace_profile(request.user)
+        admin_user = is_admin_user(request.user)
 
-        if not profile:
+        if not profile and not admin_user:
             raise PermissionDenied("Authenticated marketplace profile is required")
 
-        if profile.id not in {conversation.buyer_id, conversation.supplier_id}:
+        if not admin_user and profile.id not in {conversation.buyer_id, conversation.supplier_id}:
             raise PermissionDenied("Only conversation participants can access messages")
 
         if request.method.lower() == "get":
             queryset = conversation.messages.select_related("sender").order_by("created_at")
             output = MessageSerializer(queryset, many=True, context={"request": request})
             return Response(output.data, status=status.HTTP_200_OK)
+
+        if admin_user:
+            raise PermissionDenied("Admin can monitor conversations but cannot send messages")
 
         payload = request.data.copy()
         payload["conversation_id"] = conversation.id
@@ -255,6 +267,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         profile = get_marketplace_profile(auth_user)
         queryset = Order.objects.select_related("user", "product")
 
+        if is_admin_user(auth_user):
+            return queryset
+
         if profile and profile.role == "buyer":
             return queryset.filter(user=profile)
 
@@ -350,6 +365,15 @@ class OrderViewSet(viewsets.ModelViewSet):
             location="Supplier",
         )
 
+    def perform_update(self, serializer):
+        if not is_admin_user(self.request.user):
+            raise PermissionDenied("Only admins can edit order records directly")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        raise PermissionDenied("Orders cannot be deleted from the API")
+
     @action(detail=True, methods=["post"])
     def supplier_action(self, request, pk=None):
         profile = get_marketplace_profile(request.user)
@@ -381,6 +405,42 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save(update_fields=["status", "supplier_response"])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["post"], url_path="admin-update")
+    def admin_update(self, request, pk=None):
+        if not is_admin_user(request.user):
+            raise PermissionDenied("Only admins can update order workflow")
+
+        order = self.get_object()
+        status_value = str(request.data.get("status", "")).strip().lower()
+        response_message = str(request.data.get("supplier_response", "")).strip()
+        shipping_mode = str(request.data.get("shipping_mode", "")).strip().lower()
+        updated_fields = []
+
+        valid_statuses = {choice[0] for choice in Order.STATUS_CHOICES}
+        valid_shipping_modes = {choice[0] for choice in Order.SHIPPING_CHOICES}
+
+        if status_value:
+            if status_value not in valid_statuses:
+                raise ValidationError({"status": "Invalid order status."})
+            order.status = status_value
+            updated_fields.append("status")
+
+        if response_message:
+            order.supplier_response = response_message
+            updated_fields.append("supplier_response")
+
+        if shipping_mode:
+            if shipping_mode not in valid_shipping_modes:
+                raise ValidationError({"shipping_mode": "Invalid shipping mode."})
+            order.shipping_mode = shipping_mode
+            updated_fields.append("shipping_mode")
+
+        if not updated_fields:
+            raise ValidationError("Provide at least one field to update.")
+
+        order.save(update_fields=updated_fields)
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"])
     def analytics(self, request):
         profile = get_marketplace_profile(request.user)
@@ -407,7 +467,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         return Response(
             {
-                "scope": profile.role if profile else "all",
+                "scope": "admin" if is_admin_user(request.user) else profile.role if profile else "all",
                 "total_requests": totals["total_requests"] or 0,
                 "total_value": totals["total_value"] or 0,
                 "status_counts": status_counts,
