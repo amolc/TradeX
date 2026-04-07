@@ -90,6 +90,40 @@ class OrderFlowTests(APITestCase):
         self.assertEqual(order.status, Order.STATUS_CONFIRMED)
         self.assertEqual(order.supplier_response, "Confirmed for dispatch.")
 
+    def test_supplier_cannot_see_or_manage_other_supplier_orders(self):
+        other_supplier_auth = AuthUser.objects.create_user(
+            username="other-supplier@example.com",
+            email="other-supplier@example.com",
+            password="testpass123",
+        )
+        User.objects.create(
+            name="Other Supplier",
+            email="other-supplier@example.com",
+            role="supplier",
+        )
+        order = Order.objects.create(
+            user=self.buyer_profile,
+            product=self.product,
+            quantity=2,
+            order_type=Order.TYPE_ORDER,
+            shipping_mode=Order.SHIPPING_SEA,
+            unit_price=125.50,
+            total_amount=251.00,
+        )
+
+        self.client.force_authenticate(user=other_supplier_auth)
+
+        list_response = self.client.get(reverse("orders-list"), format="json")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data, [])
+
+        action_response = self.client.post(
+            reverse("orders-supplier-action", args=[order.id]),
+            {"action": "confirm", "message": "Should not work."},
+            format="json",
+        )
+        self.assertEqual(action_response.status_code, status.HTTP_404_NOT_FOUND)
+
 
 class ConversationFlowTests(APITestCase):
     def setUp(self):
@@ -299,6 +333,36 @@ class ConversationFlowTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_other_supplier_cannot_see_conversation_list_or_open_messages(self):
+        other_supplier_auth = AuthUser.objects.create_user(
+            username="supplier-other-chat@example.com",
+            email="supplier-other-chat@example.com",
+            password="testpass123",
+        )
+        User.objects.create(
+            name="Supplier Other",
+            email="supplier-other-chat@example.com",
+            role="supplier",
+        )
+        conversation = Conversation.objects.create(
+            buyer=self.buyer_profile,
+            supplier=self.supplier_profile,
+            product=self.product,
+            inquiry_text="Initial inquiry",
+        )
+
+        self.client.force_authenticate(user=other_supplier_auth)
+
+        list_response = self.client.get(reverse("conversations-list"), format="json")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data, [])
+
+        detail_response = self.client.get(
+            reverse("conversations-messages", args=[conversation.id]),
+            format="json",
+        )
+        self.assertEqual(detail_response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_buyer_can_accept_offer_and_create_order(self):
         conversation = Conversation.objects.create(

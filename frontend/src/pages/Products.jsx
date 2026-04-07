@@ -10,8 +10,8 @@ const emptyForm = {
 }
 
 function Products() {
-  const { role } = useAuth()
-  const [products, setProducts] = useState([])
+  const { role, user } = useAuth()
+  const [allProducts, setAllProducts] = useState([])
   const [formData, setFormData] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -30,7 +30,7 @@ function Products() {
 
     try {
       const response = await getProducts()
-      setProducts(Array.isArray(response.data) ? response.data : [])
+      setAllProducts(Array.isArray(response.data) ? response.data : [])
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not load supplier products.')
     } finally {
@@ -100,7 +100,7 @@ function Products() {
 
     try {
       await deleteProduct(productId)
-      setProducts((current) => current.filter((item) => item.id !== productId))
+      setAllProducts((current) => current.filter((item) => item.id !== productId))
       if (editingId === productId) {
         handleReset()
       }
@@ -111,6 +111,19 @@ function Products() {
       setDeletingId(null)
     }
   }
+
+  const products = useMemo(() => {
+    const normalizedEmail = String(user?.email || '').trim().toLowerCase()
+
+    if (!normalizedEmail) {
+      return []
+    }
+
+    return allProducts.filter((product) => {
+      const supplierEmail = String(product.supplier?.email || '').trim().toLowerCase()
+      return supplierEmail === normalizedEmail
+    })
+  }, [allProducts, user?.email])
 
   const inventoryValue = useMemo(
     () =>
@@ -228,6 +241,7 @@ function Products() {
         <article className="supplier-panel">
           <p className="eyebrow">Listings</p>
           <h3 className="section-title">Current supplier products</h3>
+          <p className="page-text">Only products owned by your supplier account appear here.</p>
 
           {loading ? <Spinner label="Loading products..." /> : null}
 

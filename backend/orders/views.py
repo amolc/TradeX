@@ -6,7 +6,7 @@ from logistics.models import Logistics
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny   # 👈 CHANGED HERE
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from users.models import User
 from users.services import get_marketplace_profile
@@ -22,16 +22,24 @@ from .serializers import (
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    authentication_classes = []
-    permission_classes = [AllowAny]   # 👈 CHANGED HERE
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # TEMPORARY TESTING ONLY
-        return Conversation.objects.all().select_related(
+        profile = get_marketplace_profile(self.request.user)
+        queryset = Conversation.objects.select_related(
             "buyer", "supplier", "product"
-        ).prefetch_related(
-            "messages",
-        )
+        ).prefetch_related("messages")
+
+        if not profile:
+            return queryset.none()
+
+        if profile.role == "buyer":
+            return queryset.filter(buyer=profile)
+
+        if profile.role == "supplier":
+            return queryset.filter(supplier=profile)
+
+        return queryset.none()
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -48,11 +56,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile or profile.role != "buyer":
             raise PermissionDenied("Only buyers can create inquiries")
@@ -103,14 +107,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get", "post"], url_path="messages")
     def messages(self, request, pk=None):
         conversation = self.get_object()
-
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            profile = (
-                User.objects.filter(pk=conversation.buyer_id).first()
-                or User.objects.filter(role="buyer").first()
-            )
+        profile = get_marketplace_profile(request.user)
 
         if not profile:
             raise PermissionDenied("Authenticated marketplace profile is required")
@@ -157,7 +154,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.GenericViewSet):
-    permission_classes = [AllowAny]   # 👈 CHANGED HERE
+    permission_classes = [IsAuthenticated]
     serializer_class = MessageSerializer
 
     def get_serializer_class(self):
@@ -169,11 +166,7 @@ class MessageViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile:
             raise PermissionDenied("Authenticated marketplace profile is required")
@@ -210,11 +203,7 @@ class MessageViewSet(viewsets.GenericViewSet):
         serializer = AcceptOfferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if getattr(request.user, "is_authenticated", False):
-            profile = get_marketplace_profile(request.user)
-        else:
-            # TEMPORARY TESTING LOGIC: allow local API testing without auth setup.
-            profile = User.objects.filter(role="buyer").first()
+        profile = get_marketplace_profile(request.user)
 
         if not profile:
             raise PermissionDenied("Authenticated marketplace profile is required")
@@ -258,31 +247,25 @@ class MessageViewSet(viewsets.GenericViewSet):
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    # TEMPORARY TESTING ONLY
-    authentication_classes = []
     serializer_class = OrderSerializer
-    permission_classes = [AllowAny]   # 👈 OPTIONAL (you can keep IsAuthenticated if you want)
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         auth_user = self.request.user
         profile = get_marketplace_profile(auth_user)
+        queryset = Order.objects.select_related("user", "product")
 
         if profile and profile.role == "buyer":
-            return Order.objects.filter(user=profile).select_related("user", "product")
+            return queryset.filter(user=profile)
 
         if profile and profile.role == "supplier":
-            return Order.objects.filter(product__supplier=auth_user).select_related("user", "product")
+            return queryset.filter(product__supplier=auth_user)
 
-        return Order.objects.all().select_related("user", "product")
+        return queryset.none()
 
     def perform_create(self, serializer):
-        if getattr(self.request.user, "is_authenticated", False):
-            auth_user = self.request.user
-            profile = get_marketplace_profile(auth_user)
-        else:
-            # TEMPORARY TESTING ONLY
-            auth_user = None
-            profile = User.objects.filter(role="buyer").first()
+        auth_user = self.request.user
+        profile = get_marketplace_profile(auth_user)
 
         if not profile or profile.role != "buyer":
             raise PermissionDenied("Only buyers can create enquiries or orders")
@@ -292,7 +275,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order_type = serializer.validated_data.get("order_type", Order.TYPE_ORDER)
         shipping_mode = serializer.validated_data.get("shipping_mode", "")
 
-        if auth_user and product.supplier_id == auth_user.id:
+        if product.supplier_id == auth_user.id:
             raise ValidationError("You cannot create a request for your own product")
 
         if quantity <= 0:
@@ -371,15 +354,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def supplier_action(self, request, pk=None):
         profile = get_marketplace_profile(request.user)
         order = self.get_object()
+        user = request.user
 
-        if getattr(request.user, "is_authenticated", False):
-            user = request.user
-        else:
-            # TEMPORARY TESTING ONLY
-            user = order.product.supplier
-
-        # TEMPORARY TESTING ONLY
-        if False:
+        if not profile or profile.role != "supplier":
             raise PermissionDenied("Only suppliers can respond to enquiries or confirm orders")
 
         if order.product.supplier_id != user.id:

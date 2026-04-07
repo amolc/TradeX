@@ -26,3 +26,26 @@ class ProductViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only suppliers can create products")
 
         serializer.save(supplier=self.request.user)
+
+    def perform_update(self, serializer):
+        profile = get_marketplace_profile(self.request.user)
+        product = self.get_object()
+
+        if not profile or profile.role != 'supplier':
+            raise PermissionDenied("Only suppliers can update products")
+
+        if product.supplier_id != self.request.user.id:
+            raise PermissionDenied("You can only update your own products")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        profile = get_marketplace_profile(self.request.user)
+
+        if not profile or profile.role != 'supplier':
+            raise PermissionDenied("Only suppliers can delete products")
+
+        if instance.supplier_id != self.request.user.id:
+            raise PermissionDenied("You can only delete your own products")
+
+        instance.delete()

@@ -256,10 +256,10 @@ function Enquiries() {
                       <td>
                         <button
                           className="button"
-                          onClick={() => navigate(`/supplier/enquiries/${order.conversation_id}`)}
+                          onClick={() => navigate(`/conversations/${order.conversation_id}`)}
                           type="button"
                         >
-                          Open Detail
+                          Open Chat
                         </button>
                       </td>
                     </tr>
@@ -358,6 +358,18 @@ function Enquiries() {
           <p className="page-text">
             This posts a structured quotation into the same buyer-supplier conversation.
           </p>
+
+          {selectedOrder?.conversation_id ? (
+            <div className="button-row section-gap" style={{ marginTop: 0, marginBottom: 16 }}>
+              <button
+                className="button secondary"
+                onClick={() => navigate(`/conversations/${selectedOrder.conversation_id}`)}
+                type="button"
+              >
+                Open Full Chat
+              </button>
+            </div>
+          ) : null}
 
           <form className="form-grid" onSubmit={handleSendQuotation}>
             <div>

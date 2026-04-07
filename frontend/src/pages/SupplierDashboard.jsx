@@ -65,6 +65,14 @@ function SupplierDashboard() {
           ? conversationsResponse.data
           : []
 
+        const normalizedEmail = String(user?.email || '').trim().toLowerCase()
+        const ownProducts = normalizedEmail
+          ? products.filter((product) => {
+              const supplierEmail = String(product.supplier?.email || '').trim().toLowerCase()
+              return supplierEmail === normalizedEmail
+            })
+          : []
+
         const enquiryOrders = orders.filter((order) => order.order_type === 'enquiry')
         const logisticsByOrderId = logistics.reduce((map, item) => {
           map[item.order] = item
@@ -88,7 +96,7 @@ function SupplierDashboard() {
 
         setEnquiries(enquiryRows)
         setSummary({
-          totalProducts: products.length,
+          totalProducts: ownProducts.length,
           activeEnquiries: enquiryRows.filter((item) => item.status !== 'responded').length,
           ordersInProgress: orders.filter((order) => {
             if (order.order_type !== 'order') return false
@@ -110,7 +118,7 @@ function SupplierDashboard() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [user?.email])
 
   const welcomeName = useMemo(
     () => user?.name || user?.email || 'Supplier team',
@@ -280,10 +288,10 @@ function SupplierDashboard() {
                           </button>
                           <button
                             className="button"
-                            onClick={() => navigate(`/supplier/enquiries/${conversationId}`)}
+                            onClick={() => navigate(`/conversations/${conversationId}`)}
                             type="button"
                           >
-                            Send Quotation
+                            Open Chat
                           </button>
                           <button
                             className="button danger-button"

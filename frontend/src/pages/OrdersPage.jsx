@@ -91,6 +91,20 @@ function OrdersPage() {
     }
   }
 
+  const handleOpenConversation = (order) => {
+    if (order.conversation_id) {
+      navigate(`/conversations/${order.conversation_id}`)
+      return
+    }
+
+    if (order.order_type === 'order') {
+      navigate(`/orders/${order.id}`)
+      return
+    }
+
+    setError('This request does not have a linked conversation yet.')
+  }
+
   return (
     <section className="page-card">
       <h2 className="page-title">Requests and Orders</h2>
@@ -110,6 +124,7 @@ function OrdersPage() {
         <ul className="list">
           {orders.map((order) => {
             const logisticsItem = logisticsByOrderId[order.id]
+            const hasConversation = Boolean(order.conversation_id)
 
             return (
               <li className="list-item" key={order.id}>
@@ -132,6 +147,16 @@ function OrdersPage() {
                 <p>Tracking Stage: {logisticsItem?.tracking_stage || 'supplier'}</p>
                 <p>Logistics Status: {logisticsItem?.status || 'pending'}</p>
                 <p>Current Location: {logisticsItem?.location || 'Supplier'}</p>
+
+                <div className="button-row section-gap">
+                  <button
+                    className="button secondary"
+                    onClick={() => handleOpenConversation(order)}
+                    type="button"
+                  >
+                    {hasConversation ? 'Open Chat' : order.order_type === 'order' ? 'Open Order' : 'No Chat Yet'}
+                  </button>
+                </div>
 
                 {role === 'supplier' ? (
                   <div className="form-grid section-gap">
