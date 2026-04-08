@@ -7,7 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = "django-insecure-yte^1lv=0_k&+7slivbx=mf82)h5cgm!63n4s(r3$t^)n7oqzb"
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['api.tradexasia.online', 'beta.tradexasia.online', 'localhost', '127.0.0.1', 'admin.tradexasia.online',
+ 'tradexasia.online','www.tradexasia.online']
 
 # Applications
 INSTALLED_APPS = [
