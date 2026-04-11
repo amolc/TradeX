@@ -51,5 +51,7 @@ if [ -z "$COMMIT_MESSAGE" ]; then
 fi
 
 git commit -m "$COMMIT_MESSAGE"
+git push
+
 
 echo "Deployment build and commit completed."
